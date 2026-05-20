@@ -21,7 +21,7 @@ export function useICS() {
             start:       ev.startDate.toJSDate(),
             end:         ev.endDate.toJSDate(),
             location:    ev.location     || "",
-            description: ev.description || "",
+            description: (ev.description || "").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(),
           }
         }).sort((a,b) => a.start - b.start)
         setEvents(parsed)
