@@ -20,7 +20,7 @@ function DownIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fil
 function PinIcon()  { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> }
 
 export default function SchedulePage() {
-  const { events, loading, error } = useICS(ICS_URL)
+  const { events, loading, error } = useICS()
 
   if (loading) return (
     <div className="page">

@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react"
 import ICAL from "ical.js"
 
-export function useICS(url) {
+export function useICS() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!url) { setError("no_url"); setLoading(false); return }
-    fetch(url)
+    fetch('/.netlify/functions/calendar')
       .then(r => { if (!r.ok) throw new Error(r.status); return r.text() })
       .then(text => {
         const jcal = ICAL.parse(text)
@@ -29,7 +28,7 @@ export function useICS(url) {
         setLoading(false)
       })
       .catch(() => { setError("fetch_failed"); setLoading(false) })
-  }, [url])
+  }, [])
 
   return { events, loading, error }
 }
