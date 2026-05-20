@@ -1,3 +1,4 @@
+import WeatherWidget from "./WeatherWidget"
 import { useICS } from "../hooks/useICS"
 import { googleCalUrl, downloadICS } from "../utils/calendarUtils"
 
@@ -28,6 +29,7 @@ export default function SchedulePage() {
     <div className="page">
       <h2 className="page-title">Schedule</h2>
       <p className="page-sub">May 29–31 · Villa Maria Del Mar</p>
+      <WeatherWidget/>
       <div className="placeholder"><div className="spinner"/><p style={{marginTop:16,color:"var(--muted)"}}>Loading schedule...</p></div>
     </div>
   )
@@ -45,6 +47,7 @@ export default function SchedulePage() {
     <div className="page">
       <h2 className="page-title">Schedule</h2>
       <p className="page-sub">May 29–31 · Villa Maria Del Mar</p>
+      <WeatherWidget/>
 
       {events.length > 0 && (
         <button className="dl-btn" onClick={() => downloadICS(events,"memorable-retreat-full.ics")}>
