@@ -5,11 +5,7 @@ exports.handler = async function() {
   const id  = process.env.VITE_SHEETS_SPREADSHEET_ID
 
   if (!key || !id) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ debug: 'missing config', hasKey: !!key, hasId: !!id })
-    }
+    return { statusCode: 500, body: JSON.stringify({ error: 'Missing config' }) }
   }
 
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/A:E?key=${key}`
@@ -19,18 +15,29 @@ exports.handler = async function() {
       let data = ''
       res.on('data', chunk => { data += chunk })
       res.on('end', () => {
-        resolve({
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-          body: data
-        })
+        try {
+          const json = JSON.parse(data)
+          const rows = json.values || []
+          const contacts = rows.slice(1)
+            .filter(row => row[4] && row[4].toLowerCase().includes('yes'))
+            .map(row => ({
+              name:  row[0] || '',
+              email: row[1] || '',
+              phone: row[2] || '',
+              city:  row[3] || '',
+            }))
+            .filter(c => c.name)
+          resolve({
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ contacts })
+          })
+        } catch(e) {
+          resolve({ statusCode: 500, body: JSON.stringify({ error: 'Parse failed' }) })
+        }
       })
     }).on('error', err => {
-      resolve({
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: err.message })
-      })
+      resolve({ statusCode: 500, body: JSON.stringify({ error: err.message }) })
     })
   })
 }
