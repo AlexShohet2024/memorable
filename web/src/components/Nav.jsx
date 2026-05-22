@@ -13,14 +13,7 @@ export default function Nav({ page, setPage }) {
           {t.label}
         </button>
       ))}
-      
-        href="https://t.me/memorableretreat_bot"
-        target="_blank"
-        rel="noreferrer"
-        className="nav-tab nav-tab-beora"
-      >
-        Beora AI
-      </a>
+      <a href="https://t.me/memorableretreat_bot" target="_blank" rel="noreferrer" className="nav-tab nav-tab-beora">Beora AI</a>
     </nav>
   )
 }
