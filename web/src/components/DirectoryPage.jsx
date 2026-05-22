@@ -13,6 +13,19 @@ function useContacts() {
   return { contacts, loading, error }
 }
 
+function formatName(name) {
+  const parts = name.trim().split(" ")
+  if (parts.length === 1) return parts[0]
+  return parts[0] + " " + parts[parts.length - 1][0] + "."
+}
+
+function initials(name) {
+  const parts = name.trim().split(" ")
+  const first = parts[0]?.[0] || ""
+  const last  = parts.length > 1 ? parts[parts.length - 1][0] : ""
+  return (first + last).toUpperCase()
+}
+
 function makeVCard(c) {
   return ["BEGIN:VCARD","VERSION:3.0",
     "FN:" + c.name,
@@ -23,24 +36,12 @@ function makeVCard(c) {
   ].filter(Boolean).join("\r\n")
 }
 
-function downloadVCard(c) {
-  const blob = new Blob([makeVCard(c)], { type: "text/vcard" })
-  const a = document.createElement("a")
-  a.href = URL.createObjectURL(blob)
-  a.download = c.name.replace(/[^a-z0-9]/gi,"-") + ".vcf"
-  a.click()
-}
-
 function downloadAll(contacts) {
   const blob = new Blob([contacts.map(makeVCard).join("\r\n")], { type: "text/vcard" })
   const a = document.createElement("a")
   a.href = URL.createObjectURL(blob)
   a.download = "memorable-retreat-contacts.vcf"
   a.click()
-}
-
-function initials(name) {
-  return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase()
 }
 
 function DownIcon() {
@@ -80,7 +81,10 @@ export default function DirectoryPage() {
         <div key={i} className="contact-card">
           <div className="contact-avatar">{initials(c.name)}</div>
           <div className="contact-info">
-            <div className="contact-name">{c.name}</div>
+            <div className="contact-name-row">
+              <div className="contact-name">{formatName(c.name)}</div>
+              {c.room && <span className="contact-room">Room {c.room}</span>}
+            </div>
             {c.city  && <div className="contact-meta">{c.city}</div>}
             {c.email && <div className="contact-meta">{c.email}</div>}
             {c.phone && <div className="contact-meta">{c.phone}</div>}

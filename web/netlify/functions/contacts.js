@@ -1,42 +1,43 @@
-const https = require('https')
+const https = require("https")
 
 exports.handler = async function() {
   const key = process.env.VITE_SHEETS_API_KEY
   const id  = process.env.VITE_SHEETS_SPREADSHEET_ID
 
   if (!key || !id) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Missing config' }) }
+    return { statusCode: 500, body: JSON.stringify({ error: "Missing config" }) }
   }
 
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/A:E?key=${key}`
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/A:F?key=${key}`
 
   return new Promise((resolve) => {
     https.get(url, (res) => {
-      let data = ''
-      res.on('data', chunk => { data += chunk })
-      res.on('end', () => {
+      let data = ""
+      res.on("data", chunk => { data += chunk })
+      res.on("end", () => {
         try {
           const json = JSON.parse(data)
           const rows = json.values || []
           const contacts = rows.slice(1)
-            .filter(row => row[4] && row[4].toLowerCase().includes('yes'))
+            .filter(row => row[5] && row[5].toLowerCase().includes("yes"))
             .map(row => ({
-              name:  row[0] || '',
-              email: row[1] || '',
-              phone: row[2] || '',
-              city:  row[3] || '',
+              room:  row[0] || "",
+              name:  row[1] || "",
+              email: row[2] || "",
+              phone: row[3] || "",
+              city:  row[4] || "",
             }))
             .filter(c => c.name)
           resolve({
             statusCode: 200,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             body: JSON.stringify({ contacts })
           })
         } catch(e) {
-          resolve({ statusCode: 500, body: JSON.stringify({ error: 'Parse failed' }) })
+          resolve({ statusCode: 500, body: JSON.stringify({ error: "Parse failed" }) })
         }
       })
-    }).on('error', err => {
+    }).on("error", err => {
       resolve({ statusCode: 500, body: JSON.stringify({ error: err.message }) })
     })
   })

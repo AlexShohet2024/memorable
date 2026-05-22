@@ -6,9 +6,8 @@ export default function VenuePage() {
       <p className="page-sub">{VENUE.address}</p>
       <div className="card">
         <div className="card-label">Address</div>
-        <div className="card-title">{VENUE.address}</div>
-        <a href={VENUE.mapsUrl} target="_blank" rel="noreferrer" className="map-link">Open in Maps</a>
-        <br/>
+        <a href={VENUE.mapsUrl} target="_blank" rel="noreferrer" style={{display:"block",fontSize:16,fontWeight:600,color:"var(--primary)",marginBottom:2,textDecoration:"none"}}>{VENUE.address}</a>
+        
         <a href={"tel:" + VENUE.phone.replace(/[^0-9]/g,"")} className="call-btn" style={{marginTop:12}}>Call Front Desk {VENUE.phone}</a>
       </div>
       <div className="section-header">Rooms</div>
