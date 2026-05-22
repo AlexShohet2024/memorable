@@ -3,7 +3,6 @@ export default function VenuePage() {
   return (
     <div className="page">
       <h2 className="page-title">{VENUE.name}</h2>
-      <p className="page-sub">{VENUE.address}</p>
       <div className="card">
         <div className="card-label">Address</div>
         <a href={VENUE.mapsUrl} target="_blank" rel="noreferrer" style={{display:"block",fontSize:16,fontWeight:600,color:"var(--primary)",marginBottom:2,textDecoration:"none"}}>{VENUE.address}</a>

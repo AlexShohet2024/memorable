@@ -3,8 +3,8 @@ import { useICS } from "../hooks/useICS"
 import { googleCalUrl, downloadICS } from "../utils/calendarUtils"
 
 function fmt(d, mode) {
-  if (mode === "time") return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})
-  if (mode === "day")  return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})
+  if (mode === "time") return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"America/Los_Angeles"})
+  if (mode === "day")  return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",timeZone:"America/Los_Angeles"})
 }
 function groupByDay(events) {
   return events.reduce((acc, ev) => {
