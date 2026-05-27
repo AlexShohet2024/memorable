@@ -33,14 +33,18 @@ export default function WeatherWidget() {
         ;(d.list || []).forEach(item => {
           const date = new Date(item.dt * 1000)
           const label = date.toLocaleDateString("en-US",{month:"short",day:"numeric"})
-          if (RETREAT.includes(label) && !days[label]) {
-            days[label] = {
-              label,
-              high: Math.round(item.main.temp_max),
-              low:  Math.round(item.main.temp_min),
-              main: item.weather[0].main,
-              desc: item.weather[0].description,
+          if (RETREAT.includes(label)) {
+            if (!days[label]) {
+              days[label] = {
+                label,
+                high: -999,
+                low:  999,
+                main: item.weather[0].main,
+                desc: item.weather[0].description,
+              }
             }
+            days[label].high = Math.max(days[label].high, Math.round(item.main.temp_max))
+            days[label].low  = Math.min(days[label].low,  Math.round(item.main.temp_min))
           }
         })
         setForecast(Object.values(days))
