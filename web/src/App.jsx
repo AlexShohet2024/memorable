@@ -15,7 +15,7 @@ export default function App() {
   return (
     <>
       <header className="app-header">
-        <div><h1>Memorable Retreat</h1><p>Santa Cruz · May 29-31</p></div>
+        <div><h1>Memorable Men's Retreat</h1><p>Santa Cruz · May 29-31</p></div>
         <button className="host-btn" onClick={() => setShowHost(true)}>Contact Host</button>
       </header>
 
