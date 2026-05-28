@@ -10,38 +10,31 @@ const WEATHER_KEY = process.env.OPENWEATHER_API_KEY
 
 const SYSTEM = `You are the AI assistant for the Memorable Men's Retreat — a men's AA recovery retreat at Villa Maria Del Mar, 21918 E Cliff Dr, Santa Cruz, CA 95062, May 29-31, 2026.
 
+CRITICAL INSTRUCTION: You will receive the COMPLETE retreat schedule in your context on every message. Always use this exact schedule data to answer questions. Never say you don't have schedule information. Never make up a generic schedule. Always reference the actual event names, times, and descriptions from the schedule provided.
+
 CONTEXT ASSUMPTIONS — never ask for clarification on these:
 - Any question about meals, lunch, breakfast, dinner refers to the retreat schedule
 - Any question about groups, meetings, sessions refers to retreat sessions
-- Any question about "the next activity" or "what's happening" refers to the retreat schedule
-- Any question about steps, working a step, the Big Book, sponsorship, AA principles refers to Alcoholics Anonymous
+- Any question about steps, working a step, the Big Book refers to Alcoholics Anonymous
 - Any question about finding a sponsor means finding an AA sponsor
-- Any question about "the program" means AA
-- Any question about sobriety, recovery, or staying sober is in the context of AA recovery
+- Any question about the program means AA
+- Any question about sobriety or recovery is in the context of AA
 
-RETREAT FACTS:
+RETREAT CONTACTS:
 - Host: Jordan Smith (310) 745-6161
-- Backup contact: Alex Shohet (323) 899-9115
+- Backup: Alex Shohet (323) 899-9115
 - Front desk: (831) 475-1236
 - Emergency: Dominican Hospital, 1555 Soquel Dr, Santa Cruz (831) 462-7700
-- House rule: Be respectful. This is a sober space.
 - Web app: https://mmr.beora.ai
 - Carpools from Santa Monica: Clayton (310) 980-9307, Ken W. (310) 450-0033
-- One open spot available — contact Jordan if someone wants to join
 
-AA KNOWLEDGE — how to respond:
-- Step questions: answer with warmth and depth, the way a sponsor who has worked the steps would explain them — with lived texture, not clinical language
-- Sponsor questions: acknowledge they are asking about finding an AA sponsor, explain what to look for at the retreat (someone with what they want, time in the program, working the steps), and suggest they speak to Jordan or raise it in a meeting
+AA KNOWLEDGE:
+- Step questions: answer warmly, the way a sponsor who has worked the steps would explain them
+- Sponsor questions: explain what to look for, suggest speaking to Jordan or raising it in a meeting
+- Sobriety struggles: listen first, validate, then offer AA perspective
 - Big Book questions: draw on your knowledge of AA literature
-- Sobriety questions: respond with encouragement, warmth, and AA wisdom
-- If someone shares a struggle: listen first, validate, then offer AA perspective if appropriate
 
-TONE:
-- Warm, grounded, direct — like a trusted friend in recovery
-- Never clinical, never corporate, never preachy
-- Brief responses unless someone clearly wants depth
-- Plain text only — no asterisks, no hashtags, no markdown formatting
-- Under 200 words unless the question genuinely calls for more`
+TONE: Warm, grounded, direct. Never clinical or preachy. Plain text only — no asterisks, hashtags, or markdown. Under 200 words unless the question genuinely needs more.`
 
 function stripMarkdown(text) {
   return text
@@ -60,6 +53,7 @@ async function fetchSchedule() {
       const summary = (block.match(/SUMMARY:(.+)/)  || [])[1]?.trim() || ""
       const dtLine  = (block.match(/DTSTART[^\r\n]*/) || [])[0] || ""
       const dtVal   = dtLine.includes(":") ? dtLine.split(":").slice(-1)[0].trim() : ""
+      const descLine = (block.match(/DESCRIPTION:(.+)/) || [])[1]?.trim() || ""
       if (summary && dtVal) {
         const m = dtVal.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/)
         if (m) {
@@ -67,7 +61,7 @@ async function fetchSchedule() {
           const dateObj = dtVal.endsWith("Z")
             ? new Date(`${y}-${mo}-${d}T${h}:${mi}:00Z`)
             : new Date(`${y}-${mo}-${d}T${h}:${mi}:00-07:00`)
-          events.push({ summary, dateObj })
+          events.push({ summary, dateObj, desc: descLine })
         }
       }
     })
@@ -76,13 +70,55 @@ async function fetchSchedule() {
   } catch(e) { return [] }
 }
 
+function getScheduleContext(events) {
+  const now   = new Date()
+  const today = now.toLocaleDateString("en-US", {
+    weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles"
+  })
+
+  let context = `Today is ${today} (Pacific Time).\n\nCOMPLETE RETREAT SCHEDULE — use this to answer ALL schedule questions:\n`
+  let lastDay = ""
+
+  events.forEach(ev => {
+    const dayStr  = ev.dateObj.toLocaleDateString("en-US", {
+      weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles"
+    })
+    const timeStr = ev.dateObj.toLocaleTimeString("en-US", {
+      hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles"
+    })
+    if (dayStr !== lastDay) {
+      context += `\n--- ${dayStr} ---\n`
+      lastDay = dayStr
+    }
+    context += `  ${timeStr} — ${ev.summary}`
+    if (ev.desc) context += ` (${ev.desc.substring(0, 120).replace(/\\n/g, " ")})`
+    context += `\n`
+  })
+
+  const next = events.filter(ev => ev.dateObj > now)[0]
+  if (next) {
+    const t = next.dateObj.toLocaleTimeString("en-US", {
+      hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles"
+    })
+    const d = next.dateObj.toLocaleDateString("en-US", {
+      weekday:"long", timeZone:"America/Los_Angeles"
+    })
+    context += `\nNEXT UPCOMING EVENT: ${next.summary} at ${t} PDT on ${d}.`
+  }
+  return context
+}
+
 function formatSchedule(events) {
   if (!events.length) return "No events found."
   const lines = ["Full Retreat Schedule", "─".repeat(34)]
   let lastDay = ""
   events.forEach(ev => {
-    const dayStr  = ev.dateObj.toLocaleDateString("en-US",  { weekday:"short", month:"short", day:"numeric", timeZone:"America/Los_Angeles" })
-    const timeStr = ev.dateObj.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })
+    const dayStr  = ev.dateObj.toLocaleDateString("en-US", {
+      weekday:"short", month:"short", day:"numeric", timeZone:"America/Los_Angeles"
+    })
+    const timeStr = ev.dateObj.toLocaleTimeString("en-US", {
+      hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles"
+    })
     if (dayStr !== lastDay) { if (lastDay) lines.push(""); lastDay = dayStr }
     lines.push(`${dayStr}  ·  ${timeStr} PDT  —  ${ev.summary}`)
   })
@@ -90,37 +126,9 @@ function formatSchedule(events) {
   return lines.join("\n")
 }
 
-function getScheduleContext(events) {
-  const now    = new Date()
-  const today  = now.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles" })
-  const todayEvents = events.filter(ev => {
-    const evDay = ev.dateObj.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles" })
-    return evDay === today
-  })
-  const upcoming = todayEvents.filter(ev => ev.dateObj > now)
-  const next     = upcoming[0]
-
-  let context = `Today is ${today}.\n`
-  if (todayEvents.length) {
-    context += `Today's retreat schedule:\n`
-    todayEvents.forEach(ev => {
-      const t = ev.dateObj.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })
-      const marker = next && ev.summary === next.summary ? " ← NEXT" : ""
-      context += `  ${t} PDT — ${ev.summary}${marker}\n`
-    })
-  } else {
-    context += "No retreat events scheduled for today.\n"
-  }
-  if (next) {
-    const t = next.dateObj.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })
-    context += `\nThe next event is ${next.summary} at ${t} PDT.`
-  }
-  return context
-}
-
 async function askClaude(userMessage, scheduleContext) {
   const systemWithContext = scheduleContext
-    ? `${SYSTEM}\n\nLIVE SCHEDULE CONTEXT:\n${scheduleContext}`
+    ? `${SYSTEM}\n\n${scheduleContext}`
     : SYSTEM
   const msg = await claude.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -137,7 +145,9 @@ async function getWeather() {
     const d    = await res.json()
     const days = {}
     ;(d.list || []).forEach(item => {
-      const label = new Date(item.dt * 1000).toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", timeZone:"America/Los_Angeles" })
+      const label = new Date(item.dt * 1000).toLocaleDateString("en-US", {
+        weekday:"short", month:"short", day:"numeric", timeZone:"America/Los_Angeles"
+      })
       if (!days[label]) days[label] = { high:-999, low:999, desc: item.weather[0].description }
       days[label].high = Math.max(days[label].high, item.main.temp_max)
       days[label].low  = Math.min(days[label].low,  item.main.temp_min)
@@ -180,7 +190,7 @@ bot.command("weather", async ctx => {
 bot.command("reflection", async ctx => {
   await ctx.reply("Finding a reflection for you...")
   const text = await askClaude(
-    "Give me a brief AA daily reflection — a short thought rooted in the 12-step tradition, followed by a one-sentence meditation. Keep it under 150 words. Warm and genuine. Plain text only.",
+    "Give me a brief AA daily reflection — a short thought rooted in the 12-step tradition, followed by a one-sentence meditation. Under 150 words. Warm and genuine. Plain text only.",
     null
   )
   await ctx.reply("Daily Reflection\n\n" + text)
