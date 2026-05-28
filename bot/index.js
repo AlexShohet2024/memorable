@@ -5,20 +5,25 @@ const fetch = (...args) => import("node-fetch").then(({default: f}) => f(...args
 const bot    = new Bot(process.env.TELEGRAM_BOT_TOKEN)
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const ICS_URL     = process.env.SCHEDULE_ICS_URL
-const WEATHER_KEY = process.env.OPENWEATHER_API_KEY
+const ICS_URL      = process.env.SCHEDULE_ICS_URL
+const WEATHER_KEY  = process.env.OPENWEATHER_API_KEY
+const SHEETS_KEY   = process.env.SHEETS_API_KEY
+const SHEETS_ID    = process.env.SHEETS_SPREADSHEET_ID
 
 const SYSTEM = `You are the AI assistant for the Memorable Men's Retreat — a men's AA recovery retreat at Villa Maria Del Mar, 21918 E Cliff Dr, Santa Cruz, CA 95062, May 29-31, 2026.
 
-CRITICAL INSTRUCTION: You will receive the COMPLETE retreat schedule in your context on every message. Always use this exact schedule data to answer questions. Never say you don't have schedule information. Never make up a generic schedule. Always reference the actual event names, times, and descriptions from the schedule provided.
+CRITICAL INSTRUCTIONS:
+- You will receive the COMPLETE retreat schedule and attendee directory in your context on every message
+- Always use the exact schedule data to answer schedule questions — never make up times or events
+- Always use the exact directory data to answer contact questions — never make up contact info
+- If someone asks about an attendee, look them up in the directory and share their info
+- Never say you don't have schedule or directory information
 
-CONTEXT ASSUMPTIONS — never ask for clarification on these:
-- Any question about meals, lunch, breakfast, dinner refers to the retreat schedule
-- Any question about groups, meetings, sessions refers to retreat sessions
-- Any question about steps, working a step, the Big Book refers to Alcoholics Anonymous
-- Any question about finding a sponsor means finding an AA sponsor
-- Any question about the program means AA
-- Any question about sobriety or recovery is in the context of AA
+CONTEXT ASSUMPTIONS:
+- Questions about meals, groups, sessions refer to the retreat schedule
+- Questions about steps, the Big Book, sponsorship refer to Alcoholics Anonymous
+- Questions about finding a sponsor mean finding an AA sponsor
+- "The program" means AA
 
 RETREAT CONTACTS:
 - Host: Jordan Smith (310) 745-6161
@@ -26,13 +31,11 @@ RETREAT CONTACTS:
 - Front desk: (831) 475-1236
 - Emergency: Dominican Hospital, 1555 Soquel Dr, Santa Cruz (831) 462-7700
 - Web app: https://mmr.beora.ai
-- Carpools from Santa Monica: Clayton (310) 980-9307, Ken W. (310) 450-0033
 
 AA KNOWLEDGE:
-- Step questions: answer warmly, the way a sponsor who has worked the steps would explain them
+- Step questions: answer warmly, the way a sponsor who has worked the steps would
 - Sponsor questions: explain what to look for, suggest speaking to Jordan or raising it in a meeting
 - Sobriety struggles: listen first, validate, then offer AA perspective
-- Big Book questions: draw on your knowledge of AA literature
 
 TONE: Warm, grounded, direct. Never clinical or preachy. Plain text only — no asterisks, hashtags, or markdown. Under 200 words unless the question genuinely needs more.`
 
@@ -50,9 +53,9 @@ async function fetchSchedule() {
     const events = []
     const blocks = text.split("BEGIN:VEVENT").slice(1)
     blocks.forEach(block => {
-      const summary = (block.match(/SUMMARY:(.+)/)  || [])[1]?.trim() || ""
-      const dtLine  = (block.match(/DTSTART[^\r\n]*/) || [])[0] || ""
-      const dtVal   = dtLine.includes(":") ? dtLine.split(":").slice(-1)[0].trim() : ""
+      const summary  = (block.match(/SUMMARY:(.+)/)  || [])[1]?.trim() || ""
+      const dtLine   = (block.match(/DTSTART[^\r\n]*/) || [])[0] || ""
+      const dtVal    = dtLine.includes(":") ? dtLine.split(":").slice(-1)[0].trim() : ""
       const descLine = (block.match(/DESCRIPTION:(.+)/) || [])[1]?.trim() || ""
       if (summary && dtVal) {
         const m = dtVal.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/)
@@ -70,15 +73,33 @@ async function fetchSchedule() {
   } catch(e) { return [] }
 }
 
+async function fetchContacts() {
+  try {
+    if (!SHEETS_KEY || !SHEETS_ID) return []
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_ID}/values/A:F?key=${SHEETS_KEY}`
+    const res  = await fetch(url)
+    const json = await res.json()
+    const rows = json.values || []
+    return rows.slice(1)
+      .filter(row => row[5] && row[5].toLowerCase().includes("yes"))
+      .map(row => ({
+        room:  row[0] || "",
+        name:  row[1] || "",
+        email: row[2] || "",
+        phone: row[3] || "",
+        city:  row[4] || "",
+      }))
+      .filter(c => c.name)
+  } catch(e) { return [] }
+}
+
 function getScheduleContext(events) {
   const now   = new Date()
   const today = now.toLocaleDateString("en-US", {
     weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles"
   })
-
-  let context = `Today is ${today} (Pacific Time).\n\nCOMPLETE RETREAT SCHEDULE — use this to answer ALL schedule questions:\n`
+  let context = `Today is ${today} (Pacific Time).\n\nCOMPLETE RETREAT SCHEDULE:\n`
   let lastDay = ""
-
   events.forEach(ev => {
     const dayStr  = ev.dateObj.toLocaleDateString("en-US", {
       weekday:"long", month:"long", day:"numeric", timeZone:"America/Los_Angeles"
@@ -86,15 +107,11 @@ function getScheduleContext(events) {
     const timeStr = ev.dateObj.toLocaleTimeString("en-US", {
       hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles"
     })
-    if (dayStr !== lastDay) {
-      context += `\n--- ${dayStr} ---\n`
-      lastDay = dayStr
-    }
+    if (dayStr !== lastDay) { context += `\n--- ${dayStr} ---\n`; lastDay = dayStr }
     context += `  ${timeStr} — ${ev.summary}`
-    if (ev.desc) context += ` (${ev.desc.substring(0, 120).replace(/\\n/g, " ")})`
+    if (ev.desc) context += ` (${ev.desc.substring(0,120).replace(/\\n/g," ")})`
     context += `\n`
   })
-
   const next = events.filter(ev => ev.dateObj > now)[0]
   if (next) {
     const t = next.dateObj.toLocaleTimeString("en-US", {
@@ -105,6 +122,20 @@ function getScheduleContext(events) {
     })
     context += `\nNEXT UPCOMING EVENT: ${next.summary} at ${t} PDT on ${d}.`
   }
+  return context
+}
+
+function getContactsContext(contacts) {
+  if (!contacts.length) return ""
+  let context = "\n\nATTENDEE DIRECTORY (these attendees have opted in to share their info):\n"
+  contacts.forEach(c => {
+    context += `\n${c.name}`
+    if (c.room)  context += ` — Room ${c.room}`
+    if (c.city)  context += ` — ${c.city}`
+    if (c.email) context += ` — ${c.email}`
+    if (c.phone) context += ` — ${c.phone}`
+    context += "\n"
+  })
   return context
 }
 
@@ -126,14 +157,11 @@ function formatSchedule(events) {
   return lines.join("\n")
 }
 
-async function askClaude(userMessage, scheduleContext) {
-  const systemWithContext = scheduleContext
-    ? `${SYSTEM}\n\n${scheduleContext}`
-    : SYSTEM
+async function askClaude(userMessage, context) {
   const msg = await claude.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 500,
-    system: systemWithContext,
+    system: SYSTEM + "\n\n" + context,
     messages: [{ role: "user", content: userMessage }]
   })
   return stripMarkdown(msg.content[0].text)
@@ -160,11 +188,11 @@ async function getWeather() {
 }
 
 bot.command("start", ctx => ctx.reply(
-  `Welcome to the Memorable Men's Retreat!\n\nI'm here to help during May 29-31 at Villa Maria Del Mar, Santa Cruz.\n\nCommands:\n/schedule — Full retreat schedule\n/weather — Santa Cruz forecast\n/venue — Venue info and address\n/aa — Local AA meetings\n/reflection — Daily reflection\n/help — All commands\n\nOr ask me anything — about the schedule, the steps, sponsorship, or anything else.`
+  `Welcome to the Memorable Men's Retreat!\n\nI'm here to help during May 29-31 at Villa Maria Del Mar, Santa Cruz.\n\nCommands:\n/schedule — Full retreat schedule\n/weather — Santa Cruz forecast\n/venue — Venue info and address\n/aa — Local AA meetings\n/reflection — Daily reflection\n/help — All commands\n\nOr ask me anything — schedule, contacts, AA questions, step work.`
 ))
 
 bot.command("help", ctx => ctx.reply(
-  `Available commands:\n\n/schedule — Full retreat schedule\n/weather — Santa Cruz forecast\n/venue — Venue info\n/aa — Local AA meetings\n/reflection — AA daily reflection\n\nOr just ask me anything — schedule questions, AA questions, step work, finding a sponsor. I'm here.`
+  `Available commands:\n\n/schedule — Full retreat schedule\n/weather — Santa Cruz forecast\n/venue — Venue info\n/aa — Local AA meetings\n/reflection — AA daily reflection\n\nOr ask me anything — schedule, attendee contacts, AA questions, step work, finding a sponsor.`
 ))
 
 bot.command("venue", ctx => ctx.reply(
@@ -191,7 +219,7 @@ bot.command("reflection", async ctx => {
   await ctx.reply("Finding a reflection for you...")
   const text = await askClaude(
     "Give me a brief AA daily reflection — a short thought rooted in the 12-step tradition, followed by a one-sentence meditation. Under 150 words. Warm and genuine. Plain text only.",
-    null
+    ""
   )
   await ctx.reply("Daily Reflection\n\n" + text)
 })
@@ -201,9 +229,9 @@ bot.on("message:text", async ctx => {
   if (text.startsWith("/")) return
   try {
     await ctx.reply("...")
-    const events          = await fetchSchedule()
-    const scheduleContext = getScheduleContext(events)
-    const reply           = await askClaude(text, scheduleContext)
+    const [events, contacts]  = await Promise.all([fetchSchedule(), fetchContacts()])
+    const context = getScheduleContext(events) + getContactsContext(contacts)
+    const reply   = await askClaude(text, context)
     await ctx.reply(reply)
   } catch(e) {
     await ctx.reply("Something went wrong. Try again or visit https://mmr.beora.ai")
