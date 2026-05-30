@@ -5,7 +5,7 @@ import VenuePage     from "./components/VenuePage"
 import DirectoryPage from "./components/DirectoryPage"
 import AreaGuidePage from "./components/AreaGuidePage"
 import EmergencyPage from "./components/EmergencyPage"
-import { EMERGENCY_CONTACTS } from "./data/static"
+import { EMERGENCY_CONTACTS, WIFI } from "./data/static"
 
 export default function App() {
   const [page, setPage]           = useState("schedule")
@@ -15,7 +15,7 @@ export default function App() {
   return (
     <>
       <header className="app-header">
-        <div><h1>Memorable Men's Retreat</h1><p>Santa Cruz · May 29-31</p></div>
+        <div><h1>Memorable Men's Retreat</h1><p>Santa Cruz · May 29-31 · <span style={{fontWeight:600,color:"var(--primary)"}}>WiFi: {WIFI.password}</span></p></div>
         <button className="host-btn" onClick={() => setShowHost(true)}>Contact Host</button>
       </header>
 

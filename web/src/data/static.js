@@ -1,3 +1,8 @@
+export const WIFI = {
+  network: "Villa Maria Guest",
+  password: "95062guest",
+}
+
 
 export const VENUE = {
   name: "Villa Maria Del Mar",
